@@ -1,15 +1,24 @@
 import Header from "./Header";
 import { useState, useRef } from "react";
 import { checkValidData } from "../utils/validate";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile,
+} from "firebase/auth";
 import { auth } from "../utils/firebase";
+import { useNavigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
+import { addUser, removeUser } from "../utils/userSlice";
 
 const Login = () => {
   const [isSignInForm, setIsSignInForm] = useState(true);
   const email = useRef(null);
   const password = useRef(null);
+  const name = useRef(null);
   const [message, setMessage] = useState();
-
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
   function toggleSignInForm() {
     setIsSignInForm(!isSignInForm);
   }
@@ -17,9 +26,9 @@ const Login = () => {
   function handleButtonClick() {
     const message = checkValidData(email.current.value, password.current.value);
     setMessage(message);
-    console.log("email",email.current.value, password.current.value)
-    console.log("message",message);
-     if (message) return;
+    console.log("email", email.current.value, password.current.value);
+    console.log("message", message);
+    if (message) return;
 
     if (!isSignInForm) {
       //SignUP
@@ -28,22 +37,63 @@ const Login = () => {
         auth,
         email.current.value,
         password.current.value,
+        // name.current.value
       )
         .then((userCredential) => {
           // Signed up
           const user = userCredential.user;
-          console.log(user)
+          console.log(user);
+          updateProfile(user, {
+            displayName: name.current.value,
+            photoURL:
+              "https://avatars.githubusercontent.com/u/89522439?s=96&v=4",
+          })
+            .then(() => {
+              const { uid, email, displayName, photoURL } = auth.currentUser;
+              dispatch(
+                dispatch(
+                  addUser({
+                    uid: uid,
+                    email: email,
+                    displayName: displayName,
+                    photoURL: photoURL,
+                  }),
+                ),
+              );
+              navigate("/browse");
+            })
+            .catch((error) => {
+              setMessage(error.message);
+            });
           // ...
         })
         .catch((error) => {
           const errorCode = error.code;
           const errorMessage = error.message;
-          setMessage(errorCode +" "+ errorMessage);
+          setMessage(errorCode + " " + errorMessage);
           // ..
         });
     } else {
       //SignIn
-      
+
+      signInWithEmailAndPassword(
+        auth,
+        email.current.value,
+        password.current.value,
+      )
+        .then((userCredential) => {
+          // Signed in
+          const user = userCredential.user;
+          console.log(user);
+          navigate("/browse");
+          // ...
+        })
+        .catch((error) => {
+          const errorCode = error.code;
+          const errorMessage = error.message;
+          setMessage(errorCode + " " + errorMessage);
+          navigate("/");
+        });
     }
   }
   return (
@@ -65,6 +115,7 @@ const Login = () => {
         {!isSignInForm && (
           <input
             type="text"
+            ref={name}
             placeholder="Full Name"
             className="p-2 my-4 w-full bg-gray-600"
           ></input>
